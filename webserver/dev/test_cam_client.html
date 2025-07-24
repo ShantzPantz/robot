@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ESP32-CAM Simulator</title>
+</head>
+<body>
+  <h2>ESP32-CAM Web Simulator</h2>
+  <video id="video" autoplay width="320" height="240"></video>
+  <br>
+  <button id="captureBtn">Capture & Send</button>
+  <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
+  <audio id="audio" controls></audio>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureBtn = document.getElementById('captureBtn');
+    const audio = document.getElementById('audio');
+    const serverURL = "http://127.0.0.1:5000/upload"; // change if needed
+
+    // 🔧 Start webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { console.error("Error accessing webcam:", err); });
+
+    // 📷 Capture and send to Flask
+    captureBtn.addEventListener('click', async () => {
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to blob
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append("image", blob, "frame.jpg");
+
+        try {
+          const response = await fetch(serverURL, {
+            method: "POST",
+            body: formData
+          });
+
+          if (!response.ok) throw new Error("Server error");
+
+          const audioBlob = await response.blob();
+          const audioURL = URL.createObjectURL(audioBlob);
+          audio.src = audioURL;
+          audio.play();
+        } catch (err) {
+          console.error("Upload or playback failed:", err);
+          alert("Something went wrong. Check console.");
+        }
+      }, "image/jpeg");
+    });
+  </script>
+</body>
+</html>
