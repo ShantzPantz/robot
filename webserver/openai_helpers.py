@@ -7,8 +7,8 @@ from openai import OpenAI
 
 client = OpenAI()
 
-DEFAULT_MODEL = 'gpt-3.5-turbo'
-VISION_MODEL = 'gpt-4-vision-preview'
+DEFAULT_MODEL = 'o4-mini'
+VISION_MODEL = 'o4-mini'
 MAX_CHAT_HISTORY = 20
 
 chat_history = []
@@ -59,6 +59,28 @@ def encode_image(image_path):
 
 #     return transcription.text
 
+def test_response(base64_image):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "What can you tell me about this image?"},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ]
+    )
+
+    # Output the assistant's response
+    print(response.choices[0].message.content)
+    return response.choices[0].message.content
 
 def generate_new_line(base64_image):
     return [
@@ -68,8 +90,10 @@ def generate_new_line(base64_image):
                 {"type": "text", "text": "Describe this image. Pay special attention to the people in the photo."},
                 {
                     "type": "image_url",
-                    "image_url": f"data:image/jpeg;base64,{base64_image}",
-                },
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                    }
+                }
             ],
         },
     ]
@@ -91,7 +115,9 @@ def analyze_image(user, base64_image, command):
             },
             {
                 "type": "image_url",
-                "image_url": f"data:image/jpeg;base64,{base64_image}",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
+                }
             },
         ],
     }
@@ -114,15 +140,15 @@ def generate_response(user, command):
     return execute_chat_completion(DEFAULT_MODEL, system_message, user_message)
 
 
-def execute_chat_completion(model, system_message, user_message, max_tokens=250):  
+def execute_chat_completion(model, system_message, user_message):  
     global chat_history
+    print(len(chat_history))
     chat_history.append(user_message)
     full_chat = [system_message] + chat_history
     
     response = client.chat.completions.create(
         model=model,
-        messages=full_chat,
-        max_tokens=max_tokens
+        messages=full_chat
     )
 
     response_message = response.choices[0].message
