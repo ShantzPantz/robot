@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file
+from flask import Flask, request, send_file, Response
 from PIL import Image 
 import asyncio
 import edge_tts
@@ -13,17 +13,14 @@ app = Flask(__name__)
 CORS(app) 
 # Text-to-speech using edge-tts and save to in-memory file
 async def synthesize_speech(text: str) -> io.BytesIO:
-    file_name = f"/tmp/{uuid.uuid4()}.mp3"
-    tts = edge_tts.Communicate(text, voice="en-US-AriaNeural")  # Customize voice as needed
-    await tts.save(file_name)
-
-    # Read back into BytesIO and delete file
-    audio_bytes = io.BytesIO()
-    with open(file_name, "rb") as f:
-        audio_bytes.write(f.read())
-    os.remove(file_name)
-    audio_bytes.seek(0)
-    return audio_bytes
+    # file_name = f"/tmp/{uuid.uuid4()}.mp3"
+    # tts = edge_tts.Communicate(text, voice="en-US-AriaNeural")  # Customize voice as needed
+    tts = edge_tts.Communicate(text, voice="en-GB-RyanNeural")  
+    audio = bytearray()
+    async for chunk in tts.stream():
+        if chunk["type"] == "audio":
+            audio.extend(chunk["data"])
+    return bytes(audio)
 
 @app.route("/")
 def hello_world():
@@ -50,7 +47,7 @@ def upload():
     print("Analyzing image")
     response = "testing"
     try: 
-        response = analyze_image("dougie", base64_image, command)
+        response = analyze_image("gary", base64_image, command)
         print("Response")
         print(response)
     except Exception as e: 
@@ -59,10 +56,5 @@ def upload():
     
     # Generate TTS audio with edge-tts
     audio_bytes = asyncio.run(synthesize_speech(response))
-
-    return send_file(
-        audio_bytes,
-        mimetype="audio/mpeg",
-        download_name="response.mp3"
-    )
+    return Response(audio_bytes, mimetype="audio/mpeg")
     

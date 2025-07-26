@@ -7,9 +7,10 @@
   <h2>ESP32-CAM Web Simulator</h2>
   <video id="video" autoplay width="320" height="240"></video>
   <br>
+  <textarea id="commandtext" name="commandtext" rows="4" cols="50"></textarea>
   <button id="captureBtn">Capture & Send</button>
   <canvas id="canvas" width="320" height="240" style="display: none;"></canvas>
-  <audio id="audio" controls></audio>
+  <audio id="audio" controls autoplay></audio>
 
   <script>
     const video = document.getElementById('video');
@@ -32,7 +33,9 @@
       canvas.toBlob(async (blob) => {
         const formData = new FormData();
         formData.append("image", blob, "frame.jpg");
-        formData.append("message", "This is a test");
+        
+        const textareaElement = document.getElementById("commandtext");
+        formData.append("message", commandtext.value);
 
         try {
           const response = await fetch(serverURL, {
