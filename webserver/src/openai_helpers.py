@@ -175,7 +175,7 @@ def execute_chat_completion(model, system_message, user_message):
     chat_history.append(response_message)
 
     if len(chat_history) > MAX_CHAT_HISTORY: 
-        chat_history = chat_history[-MAX_CHAT_HISTORY]
+        chat_history = chat_history[-MAX_CHAT_HISTORY:]
         
     return response_message.content
 

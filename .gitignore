@@ -1,4 +1,5 @@
 
 .venv
 __pycache__
-webserver/.env
+webserver/src/.env
+webserver/src/data/vosk-*
