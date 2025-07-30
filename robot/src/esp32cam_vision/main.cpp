@@ -4,7 +4,7 @@
 #include <ArduinoOTA.h>   // New: For Over-The-Air updates
 #include <ESPmDNS.h>      // New: For mDNS (network discovery)
 #include <ota_update_manager.h>
-#include <config.h>
+#include "config.h"
 
 // --- Wi-Fi Credentials ---
 const char* ssid = WIFI_SSID;
@@ -93,7 +93,7 @@ void loop() {
     lastMsg = now;
     value++;
     char msg[75];
-    snprintf(msg, sizeof(msg), "We're doing it, and we're doing it well. Message Count: %d, Free Heap: %u", value, ESP.getFreeHeap());
+    snprintf(msg, sizeof(msg), "Bots just wanna have fun. Message Count: %d, Free Heap: %u", value, ESP.getFreeHeap());
 
     Serial.print("Publishing MQTT message: ");
     Serial.println(msg);

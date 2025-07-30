@@ -5,13 +5,14 @@
 #define WIFI_SSID ""
 #define WIFI_PASSWORD ""
 
-#define MQTT_BROKER = "your_mqtt_server_host"
-#define MQTT_PORT = 1883
-#define MQTT_USERNAME = ""
-#define MQTT_PASSWORD = ""
-#define MQTT_CLIENT_ID = ""
-#define MQTT_TOPIC = ""
+#define MQTT_BROKER "your_mqtt_server_host"
+#define MQTT_PORT 1883
+#define MQTT_USERNAME ""
+#define MQTT_PASSWORD ""
+#define MQTT_CLIENT_ID ""
+#define MQTT_TOPIC ""
 
-#define OTA_HOSTNAME = ""
+#define OTA_HOSTNAME ""
+#define OTA_PASSWORD ""
 
 #endif // CONFIG_H
