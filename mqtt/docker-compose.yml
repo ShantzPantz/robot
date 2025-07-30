@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"  # Standard MQTT port
+      - "9001:9001"  # MQTT over WebSockets port (optional, useful for web clients)
+    volumes:
+      - ./mosquitto/config:/mosquitto/config  # Mount config directory
+      - ./mosquitto/data:/mosquitto/data      # Persistent storage for messages
+      - ./mosquitto/log:/mosquitto/log        # Persistent storage for logs
+    user: "1883:1883" # Use Mosquitto's default UID/GID for correct permissions on mounted volumes
+                      # (You might need to adjust this depending on your OS/Docker setup if you hit permission issues)

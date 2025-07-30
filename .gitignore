@@ -3,3 +3,5 @@
 __pycache__
 webserver/src/.env
 webserver/src/data/vosk-*
+robot/src/esp32cam_vision/config.h
+robot/src/main.cpp
