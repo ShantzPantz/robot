@@ -11,6 +11,7 @@ import base64
 from vosk import Model, KaldiRecognizer
 import wave 
 import json
+import time 
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -49,9 +50,23 @@ def transcribe_wavefile(wf):
     transcription += json.loads(rec.FinalResult()).get("text", "")
     return transcription.strip()
 
-@app.route("/")
+@app.route("/", methods=["GET", "POST"])
 def hello_world():
     return "<p>Hello, World!</p>"
+
+@app.route("/test_image_upload", methods=["POST", "GET"])
+def test_image_upload():
+    if not request.data:
+        abort(400, description="No image data received.")
+    
+    filename = str(int(time.time())) + ".jpg"
+    save_path = os.path.join(UPLOAD_FOLDER, filename)
+
+    with open(save_path, "wb") as f:
+        f.write(request.data)
+
+    print(f"Saved raw image to {save_path}")
+    return jsonify({"status": "success", "filename": filename})
 
 @app.route("/communicate", methods=["POST"])
 def communicate():
