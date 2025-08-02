@@ -6,8 +6,8 @@ services:
     ports:
       - "1883:1883"  # Standard MQTT port     
     volumes:
-      - ./mosquitto/config:/mosquitto/config  # Mount config directory
-      - ./mosquitto/data:/mosquitto/data      # Persistent storage for messages
-      - ./mosquitto/log:/mosquitto/log        # Persistent storage for logs
+      - /home/briansh/mqtt/mosquitto/config:/mosquitto/config  # Mount config directory
+      - /home/briansh/mqtt/mosquitto/data:/mosquito/data      # Persistent storage for messages
+      - /home/briansh/mqtt/mosquitto/log:/mosquitto/log        # Persistent storage for logs
     user: "1883:1883" # Use Mosquitto's default UID/GID for correct permissions on mounted volumes
                       
