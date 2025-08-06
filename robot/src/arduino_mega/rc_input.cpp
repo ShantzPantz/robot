@@ -9,13 +9,11 @@ void RCInput::setup() {
     ibus.begin(rcSerial);
 }
 
-void RCInput::loop() {
+void RCInput::loop() {    
     rcCH1 = readChannel(0, -100, 100, 0); 
     rcCH2 = readChannel(1, -100, 100, 0); 
-    Serial.print("CH1: ");
-    Serial.print(rcCH1);
-    Serial.print(" | CH2: ");
-    Serial.println(rcCH2);
+    rcVRA = readChannel(4, 0, 180, 124);
+    rcVRB = readChannel(5, 100, 180, 140);    
 }
 
 int RCInput::readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
@@ -36,4 +34,12 @@ int RCInput::getCH1() {
 
 int RCInput::getCH2() {
     return rcCH2;
+}
+
+int RCInput::getVRA() {
+    return rcVRA;
+}
+
+int RCInput::getVRB() {
+    return rcVRB;
 }

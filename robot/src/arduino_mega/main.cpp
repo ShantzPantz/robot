@@ -12,33 +12,21 @@
 #include <Arduino.h>
 #include "rc_input.h"
 #include "tank_controller.h"
+#include "serial_helper.h"
 
 RCInput rcInput(Serial1);
 TankController tankController(rcInput);
+SerialHelper esp32_vision(Serial1, "vision");
+SerialHelper esp32_audio(Serial2, "audio");
 
 void setup()
 {
   // Start serial monitor for debugging
   Serial.begin(115200);
+
   rcInput.setup();
 
-  // Set all the motor control pins to outputs
-  pinMode(in1A, OUTPUT);
-  pinMode(in2A, OUTPUT);
-  pinMode(in1B, OUTPUT);
-  pinMode(in2B, OUTPUT);
-  pinMode(stby, OUTPUT);
-
-  // Set LED pin as output
-  // pinMode(carLED, OUTPUT);
-
-  // Keep motors on standby for two seconds & flash LED
-  digitalWrite(stby, LOW);
-  digitalWrite(carLED, HIGH);
-  delay (1000);
-  digitalWrite(carLED, LOW);
-  delay (1000);
-  digitalWrite(stby, HIGH);
+  tankController.setup();
 
 }
 
@@ -47,5 +35,5 @@ void loop() {
 
   tankController.loop(); 
 
-  delay(20);  // keep this small for responsiveness
+  // delay(20);  // keep this small for responsiveness
 }

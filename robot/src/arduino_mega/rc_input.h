@@ -13,8 +13,13 @@ public:
     int readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue);
     bool readSwitch(byte channelInput, bool defaultValue);
 
-    int getCH1(); // Left - Right
-    int getCH2(); // Forward - Reverse
+    // tank steering
+    int getCH1(); 
+    int getCH2(); 
+
+    // cam mount
+    int getVRA();
+    int getVRB();
 
 private:
     IBusBM ibus;
@@ -22,6 +27,8 @@ private:
 
     int rcCH1 = 0;
     int rcCH2 = 0;
+    int rcVRA = 0;
+    int rcVRB = 0;
 };
 
 #endif
