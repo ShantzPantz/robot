@@ -13,7 +13,7 @@ void RCInput::loop() {
     rcCH1 = readChannel(0, -100, 100, 0); 
     rcCH2 = readChannel(1, -100, 100, 0); 
     rcVRA = readChannel(4, 0, 180, 124);
-    rcVRB = readChannel(5, 100, 180, 140);    
+    rcVRB = readChannel(5, 0, 180, 140);    
 }
 
 int RCInput::readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
