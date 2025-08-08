@@ -78,7 +78,7 @@ void NetworkManager::reconnectMQTT() {
 
 void NetworkManager::debugPrint(const char* msg) {
 #ifdef DEBUG
-  Serial.println(msg);
+  // Serial.println(msg);
 
   sendToMQTT(msg);
 #endif
@@ -91,25 +91,20 @@ void NetworkManager::sendToMQTT(const char* msg) {
 }
 
 bool NetworkManager::testUploadImage(String uploadUrl, const uint8_t* buf, size_t len) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected");
+  if (WiFi.status() != WL_CONNECTED) {    
     return false;
   }
 
-  HTTPClient http;
-  Serial.println("Trying to post to URL:");
-  Serial.println(uploadUrl);
+  HTTPClient http;  
   http.begin(uploadUrl);  // Initialize HTTP connection
   http.addHeader("Content-Type", "image/jpeg");
 
   int httpResponseCode = http.POST(const_cast<uint8_t*>(buf), len);  // Send image as POST body
 
   if (httpResponseCode > 0) {
-    Serial.printf("Upload succeeded. HTTP response: %d\n", httpResponseCode);
     http.end();
     return true;
-  } else {
-    Serial.printf("Upload failed. Error: %s\n", http.errorToString(httpResponseCode).c_str());
+  } else {    
     http.end();
     return false;
   }
