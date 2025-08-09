@@ -54,13 +54,17 @@ def transcribe_wavefile(wf):
 def hello_world():
     return "<p>Hello, World!</p>"
 
-@app.route("/test_image_upload", methods=["POST", "GET"])
-def test_image_upload():
+@app.route("/image_upload", methods=["POST", "GET"])
+def image_upload():    
     if not request.data:
         abort(400, description="No image data received.")
-    
+
+    # Store all files for this request together.
+    rid = request.args.get("rid")
     filename = str(int(time.time())) + ".jpg"
-    save_path = os.path.join(UPLOAD_FOLDER, filename)
+    request_folder = os.path.join(UPLOAD_FOLDER, rid)
+    os.makedirs(request_folder, exist_ok=True)
+    save_path = os.path.join(request_folder, filename)
 
     with open(save_path, "wb") as f:
         f.write(request.data)

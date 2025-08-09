@@ -90,21 +90,21 @@ void NetworkManager::sendToMQTT(const char* msg) {
   }
 }
 
-bool NetworkManager::testUploadImage(String uploadUrl, const uint8_t* buf, size_t len) {
+bool NetworkManager::uploadImage(String uploadUrl, const uint8_t* buf, size_t len) {
   if (WiFi.status() != WL_CONNECTED) {    
     return false;
   }
 
-  HTTPClient http;  
-  http.begin(uploadUrl);  // Initialize HTTP connection
+  HTTPClient http;
+  http.begin(uploadUrl);
   http.addHeader("Content-Type", "image/jpeg");
 
-  int httpResponseCode = http.POST(const_cast<uint8_t*>(buf), len);  // Send image as POST body
+  int httpResponseCode = http.POST(const_cast<uint8_t*>(buf), len);
 
   if (httpResponseCode > 0) {
     http.end();
     return true;
-  } else {    
+  } else {
     http.end();
     return false;
   }

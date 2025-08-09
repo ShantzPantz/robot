@@ -21,7 +21,7 @@ public:
     void debugPrint(const char* msg);
     void sendToMQTT(const char* msg);
 
-    bool testUploadImage(String url, const uint8_t* buf, size_t len);
+    bool uploadImage(String url, const uint8_t* buf, size_t len);
 
 private:
     WiFiClient espClient_;
