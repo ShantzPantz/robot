@@ -12,8 +12,27 @@ void RCInput::setup() {
 void RCInput::loop() {    
     rcCH1 = readChannel(0, -100, 100, 0); 
     rcCH2 = readChannel(1, -100, 100, 0); 
-    rcVRA = readChannel(4, 0, 180, 124);
-    rcVRB = readChannel(5, 0, 180, 140);    
+    rcCH3 = readChannel(2, -100, 100, 0);
+    rcCH4 = readChannel(3, -100, 100, 0);    
+    rcSWA = readSwitch(4, false);
+    rcSWB = readSwitch(5, false);
+
+// #ifdef DEBUG
+//     static long last_print = 0;
+//     long now = millis();
+//     if(now - last_print > 5000) {
+//         for(int i=0; i<=5; i++) {
+//             Serial.print("Ch ");
+//             Serial.print(i);
+//             Serial.print("=");
+//             Serial.print(ibus.readChannel(i));
+//             Serial.print("  |  ");
+//         }
+//         Serial.println("");
+//         Serial.println("-------------------------------------------------");
+//         last_print = now;
+//     }
+// #endif
 }
 
 int RCInput::readChannel(byte channelInput, int minLimit, int maxLimit, int defaultValue) {
@@ -36,10 +55,18 @@ int RCInput::getCH2() {
     return rcCH2;
 }
 
-int RCInput::getVRA() {
-    return rcVRA;
+int RCInput::getCH3() {
+    return rcCH3;
 }
 
-int RCInput::getVRB() {
-    return rcVRB;
+int RCInput::getCH4() {
+    return rcCH4;
+}
+
+bool RCInput::getSWA() {
+    return rcSWA;
+}
+
+bool RCInput::getSWB() {
+    return rcSWB;
 }

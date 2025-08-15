@@ -10,6 +10,7 @@
   Inspired by DroneBot Workshop 2021 https://dronebotworkshop.com
 */
 #include <Arduino.h>
+#include "config.h"
 #include "rc_input.h"
 #include "tank_controller.h"
 #include "cam_controller.h"

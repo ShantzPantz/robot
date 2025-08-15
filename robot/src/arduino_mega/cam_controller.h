@@ -5,8 +5,8 @@
 #include "rc_input.h"
 
 // Servo pins for Cam / Turret 
-#define PAN_PIN 11
-#define TILT_PIN 12
+#define PAN_PIN 12
+#define TILT_PIN 11
 
 class CamController {
 public:
@@ -35,5 +35,7 @@ private:
     const int MIN_TILT = 65;
     const int MAX_TILT = 130;
     unsigned long lastUpdate = 0;
+
+    void safeDetach(Servo &servo, int pin);
 };
 #endif

@@ -1,6 +1,7 @@
 #ifndef TANKCONTROLLER_H
 #define TANKCONTROLLER_H
 
+#include "config.h"
 #include "rc_input.h"
 
 // LED Connection
@@ -41,6 +42,7 @@ private:
 
     void mControlA(int mspeed, int mdir);
     void mControlB(int mspeed, int mdir);
+
 };
 
 #endif

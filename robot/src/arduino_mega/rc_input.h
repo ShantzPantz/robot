@@ -1,6 +1,7 @@
 #ifndef RCINPUT_H
 #define RCINPUT_H
 
+#include "config.h"
 #include <IBusBM.h>
 
 class RCInput {
@@ -17,9 +18,13 @@ public:
     int getCH1(); 
     int getCH2(); 
 
-    // cam mount
-    int getVRA();
-    int getVRB();
+    // camera 
+    int getCH3();
+    int getCH4();    
+
+    // switches A & B
+    bool getSWA();
+    bool getSWB();
 
 private:
     IBusBM ibus;
@@ -27,8 +32,10 @@ private:
 
     int rcCH1 = 0;
     int rcCH2 = 0;
-    int rcVRA = 0;
-    int rcVRB = 0;
+    int rcCH3 = 0;
+    int rcCH4 = 0;
+    bool rcSWA = false;
+    bool rcSWB = false;
 };
 
 #endif

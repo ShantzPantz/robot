@@ -2,6 +2,8 @@
 #include "tank_controller.h"
 #include "rc_input.h"
 
+#define DEBUG_MODE
+
 TankController::~TankController() {
     Serial.println("Destroying TankController.");
 }
@@ -27,8 +29,8 @@ void TankController::setup() {
 void TankController::loop() {
     // Read inputs    
     int turn = rcInput.getCH1();
-    int throttle = rcInput.getCH2();  
-
+    int throttle = rcInput.getCH2();      
+    
     // Smoothing
     static int smoothThrottle = 0; // static here means it will only be initialized once 
     static int smoothTurn = 0;    
@@ -55,7 +57,7 @@ void TankController::loop() {
     motorB = constrain(motorB, -255, 255);
 
     mControlA(abs(motorA), motorA >= 0);
-    mControlB(abs(motorB), motorB >= 0);          
+    mControlB(abs(motorB), motorB >= 0);        
 }
 
 // Control Motor A

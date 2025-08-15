@@ -40,6 +40,8 @@ void NetworkManager::init() {
 
     Serial.println("MQTT Setup Complete.");
     Serial.printf("Free Heap in setup(): %u bytes\n", ESP.getFreeHeap()); // Initial heap check
+    String ip = WiFi.localIP().toString();
+    debugPrint(ip.c_str());
 }
 
 void NetworkManager::loop() {
@@ -108,4 +110,8 @@ bool NetworkManager::uploadImage(String uploadUrl, const uint8_t* buf, size_t le
     http.end();
     return false;
   }
+}
+
+bool NetworkManager::isWifiConnected() {
+    return WiFi.status() == WL_CONNECTED;
 }

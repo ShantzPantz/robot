@@ -22,6 +22,8 @@ public:
     void sendToMQTT(const char* msg);
 
     bool uploadImage(String url, const uint8_t* buf, size_t len);
+    
+    bool isWifiConnected();
 
 private:
     WiFiClient espClient_;
