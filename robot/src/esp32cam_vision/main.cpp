@@ -28,6 +28,7 @@ void setup() {
 
   // --- Connect to Wi-Fi, OTA Udpates and MQTT ---
   networkManager.init();
+  networkManager.debugPrint("Setup Vision.");
 }
 
 void processCommand(String msg) {

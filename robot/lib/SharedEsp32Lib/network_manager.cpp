@@ -80,7 +80,7 @@ void NetworkManager::reconnectMQTT() {
 
 void NetworkManager::debugPrint(const char* msg) {
 #ifdef DEBUG
-  // Serial.println(msg);
+  Serial.println(msg);
 
   sendToMQTT(msg);
 #endif

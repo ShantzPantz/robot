@@ -1,10 +1,10 @@
 services:
   web:
     build: .
-    container_name: flask-webserver
+    container_name: fastapi-server
     restart: unless-stopped
     ports:
-      - "5000:5000"        
+      - "8000:8000"        
     volumes:
       - "/tmp/uploads:/app/uploads"
     environment: 

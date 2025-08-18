@@ -2,6 +2,7 @@
 <html>
 <head>
   <title>ESP32-CAM Simulator</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
   <h2>ESP32-CAM Web Simulator</h2>
@@ -56,6 +57,24 @@
         }
       }, "image/jpeg");
     });
+
+    // adjust URL to match your Flask server
+  const socket = io("http://shantz-ubuntu:5000", {
+    transports: ["websocket"], // force pure WebSocket if you like
+  });
+
+  socket.on("connect", () => {
+    console.info("Connected to server:", socket.id);
+    socket.emit("message", { data: "Hello from browser!" });
+  });
+
+  socket.on("my_response", (msg) => {
+    console.log("Server says:", msg);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Disconnected from server");
+  });
   </script>
 </body>
 </html>

@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "mqtt"
+		},
+		{
+			"path": "fastapi-server"
 		}
 	],
 	"settings": {}

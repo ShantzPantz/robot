@@ -1,6 +1,8 @@
 # Use a slim Python base image for smaller image size
 FROM python:3.12-slim
 
+RUN apt update && apt install -y ffmpeg
+
 # Set the working directory inside the container
 WORKDIR /app
 
@@ -19,4 +21,4 @@ ENV FLASK_APP=main.py
 ENV FLASK_RUN_HOST=0.0.0.0
 
 # Command to run the Flask application
-CMD ["flask", "run"]
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:5000", "main:app"]
