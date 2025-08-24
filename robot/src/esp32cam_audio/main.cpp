@@ -3,29 +3,15 @@
 #include <network_manager.h>
 #include <driver/i2s.h>
 #include <WebSocketsClient.h>
+#include "AudioTools.h"
 
-// I2S pin definitions
-#define I2S_WS   25
-#define I2S_SCK  26
-#define I2S_SD   34  // Data input from mic
-
-#define I2S_PORT          I2S_NUM_0
-#define I2S_SAMPLE_RATE   16000
-#define I2S_SAMPLE_BITS   16
-
-#define CHUNK_SIZE        256   // samples per read (256 bytes)
-#define FRAME_SIZE        1280  // total samples to send per frame (2560 bytes)
-
-NetworkManager networkManager;
 WebSocketsClient webSocket;
-
-int16_t frameBuffer[FRAME_SIZE];
-int16_t audioBuffer[CHUNK_SIZE];
-size_t framePos = 0;          // current write position
+NetworkManager networkManager;
 
 
-// Queue monitoring
-unsigned long lastPrint = 0;
+// I2SStream object (full duplex, mic & dac)
+I2SStream i2s; 
+AudioInfo audioInfo(16000, 1, 16);  // 16kHz mono 16-bit PCM
 
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
@@ -38,9 +24,11 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_TEXT:
       Serial.printf("[WS] Text: %s\n", payload);
       break;
-    case WStype_BIN:
-      Serial.printf("[WS] Binary len: %u\n", length);
+    case WStype_BIN: {
+      //   Serial.printf("[WS] Binary len: %u\n", length);	 
+      i2s.write(payload, length);
       break;
+    }
     case WStype_ERROR:
       Serial.println("[WS] Error occurred!");
       break;
@@ -54,73 +42,42 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 }
 
 void setup() {
-  Serial.begin(115200);
-  delay(100);
+    Serial.begin(115200);
+    delay(100);
+    Serial.println("\n--- Starting esp32_audio ---");
 
-  Serial.println("\n--- Starting ESP32 I2S Mic Test ---");
+    // --- Connect to Wi-Fi and handle network services ---
+    networkManager.init();
+    delay(250);
 
-  // I2S configuration
-  i2s_config_t i2s_config = {
-      .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX),
-      .sample_rate = I2S_SAMPLE_RATE,
-      .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-      .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-      .communication_format = I2S_COMM_FORMAT_I2S,
-      .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-      .dma_buf_count = 4,
-      .dma_buf_len = 512,
-      .use_apll = false,
-      .tx_desc_auto_clear = false,
-      .fixed_mclk = 0
-  };
+    // Setup I2S microphone
+    auto cfg = i2s.defaultConfig(RXTX_MODE);
+    cfg.sample_rate = audioInfo.sample_rate;
+    cfg.bits_per_sample = audioInfo.bits_per_sample;
+    cfg.channels = audioInfo.channels;
+    cfg.i2s_format = I2S_PHILIPS_FORMAT; 
+    cfg.pin_bck = 26;
+    cfg.pin_ws = 25;
+    cfg.pin_data_rx = 34; // input pin
+    cfg.pin_data = 22; // output pin
+    i2s.begin(cfg);
 
-  i2s_pin_config_t pin_config = {
-      .bck_io_num = I2S_SCK,
-      .ws_io_num = I2S_WS,
-      .data_out_num = I2S_PIN_NO_CHANGE,
-      .data_in_num = I2S_SD
-  };
-
-  i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
-  i2s_set_pin(I2S_PORT, &pin_config);
-
-  networkManager.init();
-  delay(250);
-
-  networkManager.debugPrint("Setting up I2S."); 
-
-  // server address, port and URL
-  webSocket.begin("shantz-ubuntu", 8000, "/ws"); // replace with your server IP
-  webSocket.onEvent(webSocketEvent);
-  webSocket.setReconnectInterval(5000);
-}
-
-void sendFrame(int16_t* buffer, size_t numSamples) {
-    if (webSocket.isConnected()) {
-        // Send as binary data
-        webSocket.sendBIN((uint8_t*)buffer, numSamples * sizeof(int16_t));       
-        // Serial.println("Sending Frame");
-    }
+    // Setup websockets
+    webSocket.begin("shantz-ubuntu", 8000, "/audio_test");
+    webSocket.onEvent(webSocketEvent);
+    // webSocket.setAuthorization("user", "Password"); // add when ready	
+    webSocket.setReconnectInterval(5000);	
+	  webSocket.enableHeartbeat(5000, 15000, 30000);
 }
 
 void loop() {
     networkManager.loop();
     webSocket.loop();
 
-    size_t bytesRead = 0;
-    esp_err_t result = i2s_read(I2S_PORT, audioBuffer, CHUNK_SIZE * sizeof(int16_t), &bytesRead, portMAX_DELAY);
-
-    if (result == ESP_OK && bytesRead > 0) {
-        size_t samplesRead = bytesRead / sizeof(int16_t);
-
-        // Copy audio chunk into frame buffer
-        memcpy(frameBuffer + framePos, audioBuffer, samplesRead * sizeof(int16_t));
-        framePos += samplesRead;
-
-        // If frame buffer is full, send it
-        if (framePos >= FRAME_SIZE) {
-            sendFrame(frameBuffer, FRAME_SIZE);  // send 2560 bytes
-            framePos = 0; // reset for next frame
-        }
+    // Read from mic
+    uint8_t buffer[512];
+    int len = i2s.readBytes(buffer, sizeof(buffer));
+    if (len > 0 && webSocket.isConnected()) {
+        webSocket.sendBIN(buffer, len);
     }
 }

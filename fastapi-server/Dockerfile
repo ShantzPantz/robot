@@ -1,7 +1,8 @@
 # Use a slim Python base image for smaller image size
 FROM python:3.11-slim
 
-RUN apt update && apt install -y ffmpeg
+# RUN apt update && apt install -y ffmpeg
+RUN apt-get update && apt-get install -y build-essential python3-dev && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /app

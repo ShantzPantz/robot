@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"        
     volumes:
-      - "/tmp/uploads:/app/uploads"
+      - "/tmp/audio:/app/audio"
     environment: 
       - LOG_LEVEL=INFO
 

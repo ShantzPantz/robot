@@ -1,6 +1,17 @@
 {
     "files.associations": {
         "random": "cpp",
-        "*.test": "cpp"
+        "*.test": "cpp",
+        "*.bkp": "cpp",
+        "*.i2s_bkp": "cpp",
+        "*.test2": "cpp",
+        "array": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp"
     }
 }
