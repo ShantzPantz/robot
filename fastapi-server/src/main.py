@@ -1,221 +1,127 @@
 import asyncio
-import io
-import time
-from typing import Union
-import wave
+import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
-# from lib.AudioProcessor import AudioProcessor
-from lib.SpeechToTextProcessor import SpeechToTextProcessor
 from vosk import KaldiRecognizer, Model
-import edge_tts
+from openwakeword.model import Model as OWModel
 import av
+import edge_tts
+
+from lib.SpeechToTextProcessor import SpeechToTextProcessor
+from lib.openai_helpers import generate_response
 
 app = FastAPI()
 
-# Create a global instance of the audio processor
-# Initialize it with your model paths.
-# processor = AudioProcessor(
-#     ow_model_path="path/to/your/openwakeword_model.tflite",
-#     vosk_model_path="data/vosk-models/vosk-model-en-us-0.22"
-# )
-
+# --- Models / Config
 vosk_model = Model("data/vosk-models/vosk-model-en-us-0.22")
 rec = KaldiRecognizer(vosk_model, 16000)
 
-# edge tts
-VOICE = "en-GB-ThomasNeural"
+ow_model = OWModel(wakeword_models=["data/ow-models/hey_Marvin.tflite"])
+ow_wake_word = "hey_Marvin"
+OW_FRAME_SIZE = 2560
 
-TEST_SENTENCES = [
-    "Hello there! This is the first test sentence.",
-    "How are you doing today?",
-    "The quick brown fox jumps over the lazy dog.",
-    "Numbers test: one, two, three, four, five, six, seven, eight, nine, ten.",
-    "Punctuation check: Wait—what?! Really... no way!",
-    "This is a slightly longer sentence designed to test how the text to speech system handles more continuous speech without pauses.",
-    "Time test: It is now 10:30 in the morning.",
-    "Address test: 123 Main Street, Apartment 4B, Springfield.",
-    "Date test: Today is Friday, August twenty-second, two thousand and twenty-five.",
-    "Speed test: She sells seashells by the seashore.",
-    "Math test: Two plus two equals four, and five times five equals twenty-five.",
-    "Emotion test: I am so excited! But wait, I am also a little nervous.",
-    "Foreign words: Bonjour, hola, konnichiwa, guten tag.",
-    "Spelling test: C-A-T spells cat, D-O-G spells dog.",
-    "Goodbye for now. This is the last test sentence in the cycle."
-]
+VOICE = "en-GB-ThomasNeural"
+OPENAI_PERSONALITY = "marvin"
+
+STATE_WAITING = "waiting"
+STATE_TRANSCRIBING = "transcribing"
+STATE_RESPONDING = "responding"
+
+
+async def handle_response(websocket: WebSocket, text: str, state: dict):
+    """Generate response, TTS, and stream back audio"""
+    try:
+        response = generate_response(OPENAI_PERSONALITY, text)
+
+        communicate = edge_tts.Communicate(response, VOICE)
+        decoder = av.CodecContext.create("mp3", "r")
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+
+        async for chunk in communicate.stream():
+            if chunk["type"] != "audio":
+                continue
+
+            mp3_data = chunk["data"]
+            packets = decoder.parse(mp3_data)
+            for packet in packets:
+                frames = decoder.decode(packet)
+                for frame in frames:
+                    resampled_frames = resampler.resample(frame)
+                    if resampled_frames:
+                        if not isinstance(resampled_frames, list):
+                            resampled_frames = [resampled_frames]
+                        for resampled_frame in resampled_frames:
+                            pcm_bytes = resampled_frame.to_ndarray().tobytes()
+                            await websocket.send_bytes(pcm_bytes)
+
+    except Exception as e:
+        print(f"Error in handle_response: {e}", flush=True)
+    finally:
+        # Reset state so loop starts listening again
+        state["value"] = STATE_WAITING
+        print("Done responding. Back to WAITING.", flush=True)
+
 
 @app.websocket("/audio_test")
-async def audio_test(websocket: WebSocket):    
+async def audio_test(websocket: WebSocket):
     await websocket.accept()
+    print("Client connected.", flush=True)
 
-    last_msg = 0
-    last_ping = 0
-    index = 0
-    
+    state = {"value": STATE_WAITING}
     speech = SpeechToTextProcessor(rec)
-    
-    # output_buffer = b""
+    ow_buff = b""
+
     try:
         while True:
-            await asyncio.sleep(0) 
+            message = await websocket.receive()
 
-            message = await websocket.receive()        
-             # Check the message type
-            if message["type"] == "websocket.receive":
-                # Handle incoming text or binary data
-                if "text" in message:
-                    print(f"Received text message: {message['text']}")
-                # /elif "bytes" in message:
-                    # print(f"Received binary message of {len(message['bytes'])} bytes.")
-            elif message["type"] == "websocket.ping":
-                # This block will be executed when a ping frame is received
-                print("Received a ping message.")
+            if message["type"] == "websocket.ping":
+                print("Ping")
+                continue
             elif message["type"] == "websocket.pong":
-                # This block will be executed when a pong frame is received
-                print("Received a pong message.")                 
+                print("Pong")
+                continue
 
-            now = time.time()           
+            frame = message.get("bytes")
+            if frame is None:
+                continue
 
-            if message.get("bytes") is not None:                
-                frame = message["bytes"]                
-                text = speech.process_incoming_bytes(frame)            
-                if text:                                    
-                    print(f"Sending: {text}", flush=True)
-                    communicate = edge_tts.Communicate(text, VOICE, rate="+0%", pitch="+0Hz")               
-                    decoder = av.CodecContext.create("mp3", "r")
+            # ---- STATE: WAITING (wake word detection)
+            if state["value"] == STATE_WAITING:
+                ow_buff += frame                
+                if len(ow_buff) >= OW_FRAME_SIZE:                    
+                    audio_array = np.frombuffer(ow_buff[:OW_FRAME_SIZE], dtype=np.int16)                    
+                    prediction = ow_model.predict(audio_array)                    
+                    ow_buff = ow_buff[OW_FRAME_SIZE:]                   
+                    score = prediction.get(ow_wake_word, 0.0)                    
+                    if score > 0.5:
+                        print(f"Wake word '{ow_wake_word}' detected! Score: {score}", flush=True)                        
+                        state["value"] = STATE_TRANSCRIBING
+                        ow_buff = b""
 
-                    # Set up a Resampler to convert audio to the desired format
-                    resampler = av.AudioResampler(
-                        format="s16",  # 16-bit signed integers
-                        layout="mono", # Single channel
-                        rate=16000     # 16kHz sample rate
-                    )
-                
-                    # stream is returned in mp3 format, but esp32 expects wav.
-                    async for chunk in communicate.stream():
-                        if chunk["type"] != "audio":
-                            continue                    
-                        
-                        mp3_data = chunk["data"]
+            # ---- STATE: TRANSCRIBING (speech to text)
+            elif state["value"] == STATE_TRANSCRIBING:
+                text = speech.process_incoming_bytes(frame)
+                if text and text != "the":
+                    print(f"Transcribed: {text}", flush=True)
+                    state["value"] = STATE_RESPONDING
 
-                        packets = decoder.parse(mp3_data)
-                        for packet in packets:
-                            frames = decoder.decode(packet)
-                            for frame in frames:
-                                # resample can return a single frame, a list of frames, or None
-                                resampled_frames = resampler.resample(frame)
+                    # spawn background task (non-blocking)
+                    asyncio.create_task(handle_response(websocket, text, state))
 
-                                # Handle cases where resample returns a list
-                                if resampled_frames:
-                                    # Ensure we iterate, even if it's a list with one item
-                                    if not isinstance(resampled_frames, list):
-                                        resampled_frames = [resampled_frames]
+            # ---- STATE: RESPONDING
+            elif state["value"] == STATE_RESPONDING:
+                # Drop or buffer audio frames here.
+                # For now: just ignore incoming audio while responding.
+                continue
 
-                                    for resampled_frame in resampled_frames:
-                                        pcm_bytes = resampled_frame.to_ndarray().tobytes()
-                                        await websocket.send_bytes(pcm_bytes)               
-
-
-                    
-                
-
-            # message = await websocket.receive()
-            # if message.get("bytes") is not None:                
-            #     frame = message["bytes"]                
-            #     output_buffer += frame
-            #     text = speech.process_incoming_bytes(frame)            
-            #     if text:
-            #         await websocket.send_text(text)
-            #         await websocket.send_bytes(output_buffer)
-            #         output_buffer = b""
-                    # await websocket.send_bytes(frame)
+            await asyncio.sleep(0)  # give control back to event loop
 
     except WebSocketDisconnect:
         print("Client disconnected cleanly", flush=True)
     except Exception as e:
-        print(f"Error: {e}", flush=True)
+        print(f"Error in websocket: {e}", flush=True)
     finally:
         if websocket.client_state != WebSocketState.DISCONNECTED:
             await websocket.close()
         print("WebSocket connection closed.", flush=True)
-
-
-# @app.websocket("/audio_test_old")
-# async def audio_test_old(websocket: WebSocket):
-#     AUDIO_SIZE = 16000 * 10 * 2 # 16,000 samples x 2 bytes x 10 seconds
-#     buff = b""
-
-#     await websocket.accept()
-#     print("WebSocket Audio Test.", flush=True)
-#     try:
-#         while True:
-#             message = await websocket.receive()
-            
-#             # Process only binary frames
-#             if message.get("bytes") is not None:
-#                 data = message["bytes"]
-#                 processor.test_bytes(data)
-#                 await websocket.send_bytes(data)
-#                 # buff += data
-#                 # if len(buff) >= AUDIO_SIZE:
-#                 #     # await websocket.send_text("Buffer is full.")
-#                 #     await websocket.send_bytes(buff)
-#                 #     buff = b""                
-
-#             # Process text separately
-#             elif message.get("type") == "websocket.receive" and "text" in message:
-#                 text_data = message["text"]
-#                 print(f"Received text data: {text_data}")
-#                 await websocket.send_text("got a message.")          
-
-#     except WebSocketDisconnect:
-#         print("Client disconnected cleanly", flush=True)
-#     except Exception as e:
-#         print(f"Error: {e}", flush=True)
-#     finally:
-#         if websocket.client_state != WebSocketState.DISCONNECTED:
-#             await websocket.close()
-#         print("WebSocket connection closed.", flush=True)
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     print("WebSocket connection accepted.")
-#     try:
-#         while True:
-#             message = await websocket.receive()
-            
-#             # Process only binary frames
-#             if message.get("type") == "websocket.receive" and "bytes" in message:
-#                 data = message["bytes"]
-#                 # call handle_bytes asynchronously if possible
-#                 # e.g., offload heavy work
-#                 # processor.handle_bytes(data)                
-#                 # output = processor.handle_bytes(data)
-#                 # await websocket.send_text("WTF")
-#                 # if output:
-#                 #     await websocket.send_text(output)
-#                 output = processor.handle_bytes(data)
-#                 processor.write_to_file(data)
-
-#                 # TODO if processor.has_text(), or is_ready(), some indicator that text is ready to be processed
-                
-                
-#                 # await websocket.send_text("test")
-
-#             # Process text separately
-#             elif message.get("type") == "websocket.receive" and "text" in message:
-#                 text_data = message["text"]
-#                 print(f"Received text data: {text_data}")
-#                 await websocket.send_text("got a message.")
-
-#             # Give control back to asyncio loop to process TCP
-#             await asyncio.sleep(0)  
-
-#     except Exception as e:
-#         print(f"Error: {e}")
-#     finally:
-#         if websocket.client_state != WebSocketState.DISCONNECTED:
-#             await websocket.close()
-#             processor.close_file()
-#         print("WebSocket connection closed.")

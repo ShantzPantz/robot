@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire application
 COPY /src .
 
+# Download pre-trained models once
+RUN python -c "import openwakeword.utils; openwakeword.utils.download_models()"
+
 # port to expose
 EXPOSE 8000
 
