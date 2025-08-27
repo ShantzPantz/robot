@@ -28,6 +28,25 @@ STATE_TRANSCRIBING = "transcribing"
 STATE_RESPONDING = "responding"
 
 
+# global connection mananger
+# robot_id -> dict[client_id]
+active_connections = {}
+
+# if this robot has a vision connect, ask it for an image
+async def request_image(robot_id: str): 
+    try:
+        if robot_id not in active_connections:
+            print("Robot ID not found.")
+            return 
+        if 'vision' not in active_connections[robot_id]:
+            print("vision client not found.")
+            return 
+        webSocket = active_connections[robot_id]["vision"]
+        await webSocket.send_text("request_image")
+    except Exception as e:
+        print(f"Error in request_image: {e}", flush=True)
+    
+
 async def handle_response(websocket: WebSocket, text: str, state: dict):
     """Generate response, TTS, and stream back audio"""
     try:
@@ -62,10 +81,66 @@ async def handle_response(websocket: WebSocket, text: str, state: dict):
         print("Done responding. Back to WAITING.", flush=True)
 
 
-@app.websocket("/audio_test")
-async def audio_test(websocket: WebSocket):
+@app.websocket("/robot_vision")
+async def robot_vision(websocket: WebSocket):
     await websocket.accept()
-    print("Client connected.", flush=True)
+   
+
+    robot_id = websocket.query_params.get("robot_id")
+    if not robot_id:
+        print("Connection rejected: No robot ID provided.", flush=True)
+        await websocket.close(code=1008)
+        return    
+
+    print(f"Client {robot_id} -> vision connected.", flush=True)
+    
+    if not robot_id in active_connections: 
+        active_connections[robot_id] = {}
+    if not "vision" in active_connections[robot_id]:
+        active_connections[robot_id]["vision"] = websocket
+
+    try:
+        while True: 
+            await asyncio.sleep(0)
+            message = await websocket.receive()
+
+            if message["type"] == "websocket.ping":
+                print("Ping")
+                continue
+            elif message["type"] == "websocket.pong":
+                print("Pong")
+                continue
+            
+            img_data = message.get("bytes")
+            if img_data is None:
+                continue
+            
+            print("got image data!", flush=True)
+    except WebSocketDisconnect:
+        print("Client disconnected cleanly", flush=True)
+    except Exception as e:
+        print(f"Error in websocket: {e}", flush=True)
+    finally:
+        if websocket.client_state != WebSocketState.DISCONNECTED:
+            await websocket.close()
+        print("WebSocket connection closed.", flush=True)
+
+
+@app.websocket("/robot_audio")
+async def robot_audio(websocket: WebSocket):
+    robot_id = websocket.query_params.get("robot_id")
+    if not robot_id:
+        print("Connection rejected: No robot ID provided.", flush=True)
+        await websocket.close(code=1008)
+        return    
+    
+    if not robot_id in active_connections: 
+        active_connections[robot_id] = {}
+    if not "audio" in active_connections[robot_id]:
+        active_connections[robot_id]["audio"] = websocket
+    
+    await websocket.accept()
+    print(f"Client {robot_id} -> audio connected.", flush=True)
 
     state = {"value": STATE_WAITING}
     speech = SpeechToTextProcessor(rec)
@@ -95,9 +170,12 @@ async def audio_test(websocket: WebSocket):
                     ow_buff = ow_buff[OW_FRAME_SIZE:]                   
                     score = prediction.get(ow_wake_word, 0.0)                    
                     if score > 0.5:
-                        print(f"Wake word '{ow_wake_word}' detected! Score: {score}", flush=True)                        
+                        print(f"Wake word '{ow_wake_word}' detected! Score: {score}", flush=True)  
+                        # send request for image                      
                         state["value"] = STATE_TRANSCRIBING
                         ow_buff = b""
+                        # ask for an image for vision client
+                        asyncio.create_task(request_image(robot_id))
 
             # ---- STATE: TRANSCRIBING (speech to text)
             elif state["value"] == STATE_TRANSCRIBING:

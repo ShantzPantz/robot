@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
+#include <WebSocketsClient.h>
 #include <ota_update_manager.h>
 
 class NetworkManager {
@@ -14,7 +15,7 @@ public:
     NetworkManager();
     ~NetworkManager();
 
-    void init();
+    void init(std::function<void(WStype_t, uint8_t*, size_t)> wsEventHandler);
     void reconnectMQTT();
     void loop();
 
@@ -25,10 +26,13 @@ public:
     
     bool isWifiConnected();
 
+    WebSocketsClient& getWebSocket();
+
 private:
     WiFiClient espClient_;
     PubSubClient mqttClient_;
     OtaUpdateManager updateManager_;
+    WebSocketsClient webSocket_;
 
     // --- Wi-Fi Credentials ---
     const char* ssid_ = WIFI_SSID;

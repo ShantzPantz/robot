@@ -16,7 +16,7 @@ NetworkManager::~NetworkManager() {
     Serial.println("NetworkManager destroyed.");
 }
 
-void NetworkManager::init() {
+void NetworkManager::init(std::function<void(WStype_t, uint8_t*, size_t)> wsEventHandler) {
     // --- Connect to Wi-Fi ---
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid_, password_);
@@ -35,26 +35,33 @@ void NetworkManager::init() {
     // --- Setup MQTT Client ---
     mqttClient_.setServer(mqtt_broker_, mqtt_port_);
 
-      // --- Initial MQTT Connection (after Wi-Fi and OTA setup) ---
+    // --- Initial MQTT Connection (after Wi-Fi and OTA setup) ---
     reconnectMQTT();
 
-    Serial.println("MQTT Setup Complete.");
-    Serial.printf("Free Heap in setup(): %u bytes\n", ESP.getFreeHeap()); // Initial heap check
+    // Serial.println("MQTT Setup Complete.");
+    // Serial.printf("Free Heap in setup(): %u bytes\n", ESP.getFreeHeap()); // Initial heap check
     String ip = WiFi.localIP().toString();
     debugPrint(ip.c_str());
+
+    String route = String(WEBSOCKET_ROUTE) + "?robot_id=" + String(ROBOT_ID);
+    webSocket_.begin(WEBSOCKET_HOST, WEBSOCKET_PORT, route);
+    webSocket_.onEvent(wsEventHandler);
+    webSocket_.setReconnectInterval(WEBSOCKET_RECONNECT_INTERVAL);
 }
 
 void NetworkManager::loop() {
     // --- Handle OTA updates in the loop ---
     updateManager_.checkForUpdate(); 
 
-    // // --- Ensure MQTT client is connected ---
-    // if (!mqttClient_.connected()) {
-    //   reconnectMQTT();
-    // }
+    // --- Ensure MQTT client is connected ---
+    if (!mqttClient_.connected()) {
+      reconnectMQTT();
+    }
 
     // // For MQTT to process messages 
-    // mqttClient_.loop(); 
+    mqttClient_.loop(); 
+
+    webSocket_.loop();
 }
 
 void NetworkManager::reconnectMQTT() {
@@ -80,7 +87,7 @@ void NetworkManager::reconnectMQTT() {
 
 void NetworkManager::debugPrint(const char* msg) {
 #ifdef DEBUG
-  Serial.println(msg);
+  // Serial.println(msg);
 
   sendToMQTT(msg);
 #endif
@@ -114,4 +121,8 @@ bool NetworkManager::uploadImage(String uploadUrl, const uint8_t* buf, size_t le
 
 bool NetworkManager::isWifiConnected() {
     return WiFi.status() == WL_CONNECTED;
+}
+
+WebSocketsClient& NetworkManager::getWebSocket() {
+  return webSocket_;
 }
