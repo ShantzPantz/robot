@@ -5,9 +5,7 @@
 #include <WebSocketsClient.h>
 #include "AudioTools.h"
 
-WebSocketsClient webSocket;
 NetworkManager networkManager;
-
 
 // I2SStream object (full duplex, mic & dac)
 I2SStream i2s; 
@@ -25,7 +23,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       Serial.printf("[WS] Text: %s\n", payload);
       break;
     case WStype_BIN: {
-      //   Serial.printf("[WS] Binary len: %u\n", length);	 
+      Serial.printf("[WS] Binary len: %u\n", length);	 
       i2s.write(payload, length);
       break;
     }
@@ -47,7 +45,7 @@ void setup() {
     Serial.println("\n--- Starting esp32_audio ---");
 
     // --- Connect to Wi-Fi and handle network services ---
-    networkManager.init();
+    networkManager.init(webSocketEvent);
     delay(250);
 
     // Setup I2S microphone
@@ -61,19 +59,12 @@ void setup() {
     cfg.pin_data_rx = 34; // input pin
     cfg.pin_data = 22; // output pin
     i2s.begin(cfg);
-
-    // Setup websockets
-    webSocket.begin("shantz-ubuntu", 8000, "/audio_test");
-    webSocket.onEvent(webSocketEvent);
-    // webSocket.setAuthorization("user", "Password"); // add when ready	
-    webSocket.setReconnectInterval(5000);	
-	  webSocket.enableHeartbeat(5000, 15000, 30000);
 }
 
 void loop() {
-    networkManager.loop();
-    webSocket.loop();
+    networkManager.loop();   
 
+    WebSocketsClient& webSocket = networkManager.getWebSocket();
     // Read from mic
     uint8_t buffer[512];
     int len = i2s.readBytes(buffer, sizeof(buffer));

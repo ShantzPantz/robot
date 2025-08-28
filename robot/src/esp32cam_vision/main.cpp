@@ -7,7 +7,6 @@
 
 long lastMsg = 0;
 int value = 0;
-const char* serverUrl = "http://192.168.2.64:5000/image_upload";
 
 Vision camera;
 NetworkManager networkManager;
@@ -21,6 +20,25 @@ enum State {
 State currentState = State::PASSIVE;
 String currentID = "0";
 
+void process_command(char* cmd) {
+  if (strcmp(cmd, "request_image") == 0) {
+    camera_fb_t* fb = camera.captureFrame();
+    if (!fb) {
+      networkManager.debugPrint("Camera Capture Failed.");
+      return;
+    }
+
+    // send back to websocket
+    WebSocketsClient& webSocket = networkManager.getWebSocket();
+    if(webSocket.isConnected()) {
+      webSocket.sendBIN(fb->buf, fb->len);
+    }
+          
+    // cleanup camera
+    camera.cleanup(fb);
+  }
+}
+
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
@@ -31,6 +49,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       break;
     case WStype_TEXT:
       networkManager.debugPrint("[WS] Got Text...");
+      process_command((char*)payload);
       break;
     case WStype_BIN: {
       networkManager.debugPrint("[WS] Got Binary...");    
@@ -55,7 +74,7 @@ void setup() {
 
   // --- Connect to Wi-Fi, OTA Udpates and MQTT ---
   networkManager.init(webSocketEvent);
-  networkManager.debugPrint("Setup Vision.");
+  networkManager.debugPrint("Setup Complete.");
 }
 
 // void processCommand(String msg) {

@@ -1,4 +1,6 @@
 import asyncio
+import base64
+import time
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -8,7 +10,7 @@ import av
 import edge_tts
 
 from lib.SpeechToTextProcessor import SpeechToTextProcessor
-from lib.openai_helpers import generate_response
+from lib.openai_helpers import generate_response, respond_to_image
 
 app = FastAPI()
 
@@ -20,7 +22,8 @@ ow_model = OWModel(wakeword_models=["data/ow-models/hey_Marvin.tflite"])
 ow_wake_word = "hey_Marvin"
 OW_FRAME_SIZE = 2560
 
-VOICE = "en-GB-ThomasNeural"
+# VOICE = "en-GB-ThomasNeural"
+VOICE = "en-US-GuyNeural"
 OPENAI_PERSONALITY = "marvin"
 
 STATE_WAITING = "waiting"
@@ -31,6 +34,7 @@ STATE_RESPONDING = "responding"
 # global connection mananger
 # robot_id -> dict[client_id]
 active_connections = {}
+images = {}
 
 # if this robot has a vision connect, ask it for an image
 async def request_image(robot_id: str): 
@@ -47,15 +51,22 @@ async def request_image(robot_id: str):
         print(f"Error in request_image: {e}", flush=True)
     
 
-async def handle_response(websocket: WebSocket, text: str, state: dict):
+async def handle_response(websocket: WebSocket, text: str, state: dict, base64_images: list = None):
     """Generate response, TTS, and stream back audio"""
     try:
-        response = generate_response(OPENAI_PERSONALITY, text)
+        response = ""
+        if base64_images == None or len(base64_images) == 0:
+            response = generate_response(OPENAI_PERSONALITY, text)
+        elif len(base64_images) > 0:
+            last_image = base64_images[-1]
+            response = respond_to_image(OPENAI_PERSONALITY, last_image, text)
 
+        print(response, flush=True)
+        
         communicate = edge_tts.Communicate(response, VOICE)
         decoder = av.CodecContext.create("mp3", "r")
         resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
-
+        
         async for chunk in communicate.stream():
             if chunk["type"] != "audio":
                 continue
@@ -115,7 +126,21 @@ async def robot_vision(websocket: WebSocket):
             if img_data is None:
                 continue
             
+            if robot_id not in images:
+                images[robot_id] = {"images": []}
+            
+            base64_image = base64.b64encode(img_data).decode("utf-8")
+            images[robot_id]["images"].append(base64_image)
+
             print("got image data!", flush=True)
+            filename = f"/app/uploads/ws_image_{int(time.time())}.jpg"
+            try:
+                with open(filename, "wb") as f:
+                    f.write(img_data)
+                print(f"Image successfully saved to {filename}", flush=True)
+            except IOError as e:
+                print(f"Error saving image: {e}")
+                        # convert image to data to base64 that can be used with chatgpt. Store in images[robot_id]
     except WebSocketDisconnect:
         print("Client disconnected cleanly", flush=True)
     except Exception as e:
@@ -185,7 +210,13 @@ async def robot_audio(websocket: WebSocket):
                     state["value"] = STATE_RESPONDING
 
                     # spawn background task (non-blocking)
-                    asyncio.create_task(handle_response(websocket, text, state))
+                    # get images for this robot id 
+                    robot_images = images.get(robot_id, {}).get("images", None)                    
+                    asyncio.create_task(handle_response(websocket, text, state, base64_images=robot_images.copy()))
+                    if robot_images:
+                        # clear image cache
+                        images[robot_id]["images"] = []
+                    
 
             # ---- STATE: RESPONDING
             elif state["value"] == STATE_RESPONDING:
