@@ -18,17 +18,22 @@ app = FastAPI()
 vosk_model = Model("data/vosk-models/vosk-model-en-us-0.22")
 rec = KaldiRecognizer(vosk_model, 16000)
 
-ow_model = OWModel(wakeword_models=["data/ow-models/hey_Marvin.tflite"])
-ow_wake_word = "hey_Marvin"
-OW_FRAME_SIZE = 2560
+ow_model = OWModel(wakeword_models=["data/ow-models/hey_billy.tflite"])
+ow_wake_word = "hey_billy"
+# OW_FRAME_SIZE = 2560
+OW_FRAME_SIZE = 1280
+WAKEWORD_COOLDOWN_SECS = 3.0
+
 
 # VOICE = "en-GB-ThomasNeural"
-VOICE = "en-US-GuyNeural"
-OPENAI_PERSONALITY = "marvin"
+VOICE = "en-US-GuyNeural"   
+OPENAI_PERSONALITY = "billy"
 
 STATE_WAITING = "waiting"
+STATE_WAITING_FOR_PLAYBACK = "waiting_for_playback"
 STATE_TRANSCRIBING = "transcribing"
 STATE_RESPONDING = "responding"
+THRESHOLD = 0.75
 
 
 # global connection mananger
@@ -51,7 +56,7 @@ async def request_image(robot_id: str):
         print(f"Error in request_image: {e}", flush=True)
     
 
-async def handle_response(websocket: WebSocket, text: str, state: dict, base64_images: list = None):
+async def handle_response(websocket: WebSocket, text: str, state: dict, base64_images: list = None, ow_buff: bytearray = None):
     """Generate response, TTS, and stream back audio"""
     try:
         response = ""
@@ -83,13 +88,19 @@ async def handle_response(websocket: WebSocket, text: str, state: dict, base64_i
                         for resampled_frame in resampled_frames:
                             pcm_bytes = resampled_frame.to_ndarray().tobytes()
                             await websocket.send_bytes(pcm_bytes)
-
+            
+            
     except Exception as e:
         print(f"Error in handle_response: {e}", flush=True)
     finally:
         # Reset state so loop starts listening again
-        state["value"] = STATE_WAITING
+        await websocket.send_text("cmd:end_of_stream")
+        state["value"] = STATE_WAITING_FOR_PLAYBACK
+        state["last_tts_end"] = time.time()
         print("Done responding. Back to WAITING.", flush=True)
+        
+        if ow_buff is not None:
+            ow_buff.clear()
 
 
 @app.websocket("/robot_vision")
@@ -169,7 +180,8 @@ async def robot_audio(websocket: WebSocket):
 
     state = {"value": STATE_WAITING}
     speech = SpeechToTextProcessor(rec)
-    ow_buff = b""
+    ow_buff = bytearray()
+    detection_count = 0
 
     try:
         while True:
@@ -181,26 +193,53 @@ async def robot_audio(websocket: WebSocket):
             elif message["type"] == "websocket.pong":
                 print("Pong")
                 continue
-
+            elif message["type"] == "websocket.receive" and "text" in message:
+                if message["text"] == "cmd:end_of_playback":
+                    print("Got end of playback msg.", flush=True)
+                     # flush mic frames for ~500ms
+                    flush_until = time.time() + 0.5
+                    while time.time() < flush_until:
+                        try:
+                            _ = await websocket.receive_bytes()
+                        except Exception:
+                            break
+                    
+                    print("Do waiting", flush=True)
+                    ow_buff.clear()
+                    state["value"] = STATE_WAITING                    
+                
             frame = message.get("bytes")
             if frame is None:
                 continue
 
             # ---- STATE: WAITING (wake word detection)
             if state["value"] == STATE_WAITING:
-                ow_buff += frame                
+                if "last_tts_end" in state and time.time() - state["last_tts_end"] < WAKEWORD_COOLDOWN_SECS:
+                    continue  # skip wakeword detection during cooldown
+
+                ow_buff.extend(frame)          
                 if len(ow_buff) >= OW_FRAME_SIZE:                    
                     audio_array = np.frombuffer(ow_buff[:OW_FRAME_SIZE], dtype=np.int16)                    
                     prediction = ow_model.predict(audio_array)                    
                     ow_buff = ow_buff[OW_FRAME_SIZE:]                   
                     score = prediction.get(ow_wake_word, 0.0)                    
-                    if score > 0.5:
-                        print(f"Wake word '{ow_wake_word}' detected! Score: {score}", flush=True)  
-                        # send request for image                      
-                        state["value"] = STATE_TRANSCRIBING
-                        ow_buff = b""
-                        # ask for an image for vision client
+                    if score > THRESHOLD:
+                        print(f"Wake word '{ow_wake_word}' detected! Score: {score}", flush=True)                          
+                        
+                        # # ask for an image for vision client
                         asyncio.create_task(request_image(robot_id))
+                        
+                        start_time = time.time()
+                        FLUSH_SIZE = 32000
+                        while time.time() - start_time < 5:
+                            prediction = ow_model.predict(np.zeros(FLUSH_SIZE))
+                            positive_detections = {key: value for key, value in prediction.items() if value > THRESHOLD}
+                            if (len(positive_detections) == 0):
+                                break
+                            await asyncio.sleep(0.1)
+
+                        state["value"] = STATE_TRANSCRIBING
+                        
 
             # ---- STATE: TRANSCRIBING (speech to text)
             elif state["value"] == STATE_TRANSCRIBING:
@@ -208,18 +247,19 @@ async def robot_audio(websocket: WebSocket):
                 if text and text != "the":
                     print(f"Transcribed: {text}", flush=True)
                     state["value"] = STATE_RESPONDING
+                    ow_buff.clear()
 
                     # spawn background task (non-blocking)
                     # get images for this robot id 
-                    robot_images = images.get(robot_id, {}).get("images", None)                    
-                    asyncio.create_task(handle_response(websocket, text, state, base64_images=robot_images.copy()))
-                    if robot_images:
+                    robot_images = images.get(robot_id, {}).get("images", None)     
+                    if robot_images != None:               
+                        asyncio.create_task(handle_response(websocket, text, state, base64_images=robot_images.copy()))                    
                         # clear image cache
                         images[robot_id]["images"] = []
                     
 
             # ---- STATE: RESPONDING
-            elif state["value"] == STATE_RESPONDING:
+            elif state["value"] == STATE_RESPONDING or state["value"] == STATE_WAITING_FOR_PLAYBACK:
                 # Drop or buffer audio frames here.
                 # For now: just ignore incoming audio while responding.
                 continue

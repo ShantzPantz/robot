@@ -40,7 +40,7 @@ bool Vision::initialize() {
     Serial.println("Found psram!"); // Changed to println for new line
     config.frame_size = FRAMESIZE_SVGA; // Start with a smaller frame size like SVGA or XGA for initial testing
                                          // QVGA might be too small if you plan to scale up.
-    config.jpeg_quality = 10; // Lower quality for initial test, closer to 0 is higher quality, 63 is lowest
+    config.jpeg_quality = 8; // Lower quality for initial test, closer to 0 is higher quality, 63 is lowest
     config.fb_count = 2;
   } else {
     Serial.println("No psram!"); // Changed to println

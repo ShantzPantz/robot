@@ -1,34 +1,31 @@
-/**
- * @file streams-generator-serial.ino
- * @author Phil Schatzmann
- * @brief see https://github.com/pschatzmann/arduino-audio-tools/blob/main/examples/examples-stream/streams-generator-serial/README.md 
- * @copyright GPLv3
- **/
- 
-#include "AudioTools.h"
+/* Sweep
+ by BARRAGAN <http://barraganstudio.com>
+ This example code is in the public domain.
 
+ modified 8 Nov 2013
+ by Scott Fitzgerald
+ https://www.arduino.cc/en/Tutorial/LibraryExamples/Sweep
+*/
+#include <Arduino.h>
+#include <Servo.h>
 
-AudioInfo audio_info(44100, 2, 16);
-SineWaveGenerator<int16_t> sineWave(32000);                // subclass of SoundGenerator with max amplitude of 32000
-GeneratedSoundStream<int16_t> sound(sineWave);             // Stream generated from sine wave
-CsvOutput<int16_t> out(Serial); 
-StreamCopy copier(out, sound);                             // copies sound to out
+Servo myservo;  // create Servo object to control a servo
+// twelve Servo objects can be created on most boards
 
-// Arduino Setup
-void setup(void) {  
-  // Open Serial 
-  Serial.begin(115200);
-  //AudioToolsLogger.begin(Serial, AudioToolsLogLevel::Warning);
+int pos = 0;    // variable to store the servo position
 
-  // Define CSV Output
-  out.begin(audio_info);
-
-  // Setup sine wave
-  sineWave.begin(audio_info, N_B4);
-  Serial.println("started...");
+void setup() {
+  myservo.attach(9);  // attaches the servo on pin 9 to the Servo object
 }
 
-// Arduino loop - copy sound to out 
 void loop() {
-  copier.copy();
+  for (pos = 0; pos <= 180; pos += 1) { // goes from 0 degrees to 180 degrees
+    // in steps of 1 degree
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);                       // waits 15 ms for the servo to reach the position
+  }
+  for (pos = 180; pos >= 0; pos -= 1) { // goes from 180 degrees to 0 degrees
+    myservo.write(pos);              // tell servo to go to position in variable 'pos'
+    delay(15);                       // waits 15 ms for the servo to reach the position
+  }
 }

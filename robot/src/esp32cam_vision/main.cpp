@@ -109,27 +109,5 @@ void loop() {
   //   networkManager.debugPrint(msg.c_str());
   //   processCommand(msg);
   // }
-  
-  // if (currentState == State::ACTIVE) {
-  //   // --- Publish a message every 5 seconds while active---
-  //   long now = millis();
-  //   if (now - lastMsg > 5000) {
-  //     lastMsg = now;    
-
-  //     networkManager.debugPrint("Taking a picture! Again.");
-  //     camera_fb_t* fb = camera.captureFrame();
-  //     if (!fb) {
-  //       networkManager.debugPrint("Camera Capture Failed.");
-  //       return;
-  //     }
-      
-  //     if(networkManager.uploadImage(serverUrl + String("?rid=") + currentID, fb->buf, fb->len)) {
-  //       networkManager.debugPrint("Upload successful");
-  //     }else{
-  //       networkManager.debugPrint("Failed to upload image.");
-  //     }
-  //     // cleanup camera
-  //     camera.cleanup(fb);
-  //   }
-  // }  
+    
 }
