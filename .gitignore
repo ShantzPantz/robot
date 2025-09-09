@@ -11,3 +11,4 @@ robot/src/arduino_mega/config.h
 robot/esp32_cam_audio/audio_sketch/audio_sketch.ino
 robot/esp32_cam_audio/main.cpp
 fastapi-server/src/.env
+robot/src/esp32cam_audio/main.cpp.i2s_bkp

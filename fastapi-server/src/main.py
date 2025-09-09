@@ -181,7 +181,6 @@ async def robot_audio(websocket: WebSocket):
     state = {"value": STATE_WAITING}
     speech = SpeechToTextProcessor(rec)
     ow_buff = bytearray()
-    detection_count = 0
 
     try:
         while True:
@@ -195,16 +194,7 @@ async def robot_audio(websocket: WebSocket):
                 continue
             elif message["type"] == "websocket.receive" and "text" in message:
                 if message["text"] == "cmd:end_of_playback":
-                    print("Got end of playback msg.", flush=True)
-                     # flush mic frames for ~500ms
-                    flush_until = time.time() + 0.5
-                    while time.time() < flush_until:
-                        try:
-                            _ = await websocket.receive_bytes()
-                        except Exception:
-                            break
-                    
-                    print("Do waiting", flush=True)
+                    print("Got end of playback msg. WAITING", flush=True)                                                            
                     ow_buff.clear()
                     state["value"] = STATE_WAITING                    
                 
@@ -229,18 +219,18 @@ async def robot_audio(websocket: WebSocket):
                         # # ask for an image for vision client
                         asyncio.create_task(request_image(robot_id))
                         
+                        state["value"] = STATE_TRANSCRIBING
+
                         start_time = time.time()
                         FLUSH_SIZE = 32000
-                        while time.time() - start_time < 5:
+                        while time.time() - start_time < 2:
                             prediction = ow_model.predict(np.zeros(FLUSH_SIZE))
                             positive_detections = {key: value for key, value in prediction.items() if value > THRESHOLD}
                             if (len(positive_detections) == 0):
                                 break
                             await asyncio.sleep(0.1)
 
-                        state["value"] = STATE_TRANSCRIBING
                         
-
             # ---- STATE: TRANSCRIBING (speech to text)
             elif state["value"] == STATE_TRANSCRIBING:
                 text = speech.process_incoming_bytes(frame)
